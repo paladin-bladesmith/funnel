@@ -2,7 +2,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use bytemuck::{Pod, PodCastError, Zeroable};
 use solana_program::pubkey::Pubkey;
 
-#[derive(Debug, Clone, Copy, Zeroable, Pod, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Zeroable, Pod, BorshSerialize, BorshDeserialize)]
 #[repr(C)]
 pub struct Funnel {
     /// Dynamic state that tracks the current recipient of funnel rewards
@@ -28,7 +28,7 @@ impl Funnel {
     }
 }
 
-#[derive(Debug, Clone, Copy, Zeroable, Pod, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Zeroable, Pod, BorshSerialize, BorshDeserialize)]
 #[repr(C)]
 pub struct FunnelConfig {
     pub stakers_receiver: Pubkey,
