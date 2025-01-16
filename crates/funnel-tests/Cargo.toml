@@ -16,4 +16,5 @@ bytemuck = { workspace = true }
 expect-test = { workspace = true }
 funnel = { workspace = true }
 solana-sdk = { workspace = true }
-svm-test = { workspace = true }
+spl-memo = { workspace = true }
+svm-test = { workspace = true, features = ["spl"] }
