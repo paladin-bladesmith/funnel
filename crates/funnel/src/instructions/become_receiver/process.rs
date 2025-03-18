@@ -28,9 +28,9 @@ struct BecomeReceiverAccounts<'a, 'info> {
     holders_receiver: &'a AccountInfo<'info>,
     /// CHECK: Must match validator's Jito distribution account.
     receiver_old: &'a AccountInfo<'info>,
-    receiver_new: &'a AccountInfo<'info>,
-    /// CHECK: Must match `PDA(receiver_new)`.
-    receiver_new_state: &'a AccountInfo<'info>,
+    leader: &'a AccountInfo<'info>,
+    /// CHECK: Must match `PDA(leader)`.
+    leader_state: &'a AccountInfo<'info>,
 }
 
 pub(crate) fn process(
@@ -46,8 +46,8 @@ pub(crate) fn process(
         stakers_receiver: accounts_iter.next().unwrap(),
         holders_receiver: accounts_iter.next().unwrap(),
         receiver_old: accounts_iter.next().unwrap(),
-        receiver_new: accounts_iter.next().unwrap(),
-        receiver_new_state: accounts_iter.next().unwrap(),
+        leader: accounts_iter.next().unwrap(),
+        leader_state: accounts_iter.next().unwrap(),
     };
 
     // Validate & deserialize the funnel account.
@@ -86,46 +86,51 @@ pub(crate) fn process(
     let funnel = bytemuck::from_bytes_mut::<Funnel>(&mut funnel);
     funnel.receiver = new_receiver;
 
+    // TODO:
+    // - Receiver cannot pay for funding the state.
+    // - Let's add another account leader (from which leader state is derived). Then
+    //   receiver can be whatever (distribution account) without affecting leader
+    //   accounting etc.
+
     // Initialize the leader state account if necessary.
-    let (leader_state, leader_state_bump) =
-        crate::find_leader_state(funnel_accounts.receiver_new.key);
-    assert_eq!(funnel_accounts.receiver_new_state.key, &leader_state,);
-    if funnel_accounts.receiver_new_state.owner != &crate::ID {
+    let (leader_state, leader_state_bump) = crate::find_leader_state(funnel_accounts.leader.key);
+    assert_eq!(funnel_accounts.leader_state.key, &leader_state);
+    if funnel_accounts.leader_state.owner != &crate::ID {
         // Transfer lamports for rent if necessary.
         let required = Rent::get()?.minimum_balance(LeaderState::LEN);
-        let existing = **funnel_accounts.receiver_new_state.lamports.borrow();
+        let existing = **funnel_accounts.leader_state.lamports.borrow();
         let additional = required.saturating_sub(existing);
         if additional > 0 {
             invoke(
                 &system_instruction::transfer(
-                    funnel_accounts.receiver_new.key,
-                    funnel_accounts.receiver_new_state.key,
+                    funnel_accounts.leader.key,
+                    funnel_accounts.leader_state.key,
                     additional,
                 ),
-                &[funnel_accounts.receiver_new.clone(), funnel_accounts.receiver_new_state.clone()],
+                &[funnel_accounts.leader.clone(), funnel_accounts.leader_state.clone()],
             )?;
         }
 
         // Allocate the required space.
         invoke_signed(
             &system_instruction::allocate(
-                funnel_accounts.receiver_new_state.key,
+                funnel_accounts.leader_state.key,
                 LeaderState::LEN as u64,
             ),
-            &[funnel_accounts.receiver_new_state.clone()],
-            &[&[&funnel_accounts.receiver_new.key.to_bytes() as &[u8], &[leader_state_bump]]],
+            &[funnel_accounts.leader_state.clone()],
+            &[&[&funnel_accounts.leader.key.to_bytes() as &[u8], &[leader_state_bump]]],
         )?;
 
         // Set the funnel program as the owner.
         invoke_signed(
-            &system_instruction::assign(funnel_accounts.receiver_new_state.key, &crate::ID),
-            &[funnel_accounts.receiver_new_state.clone()],
-            &[&[&funnel_accounts.receiver_new.key.to_bytes() as &[u8], &[leader_state_bump]]],
+            &system_instruction::assign(funnel_accounts.leader_state.key, &crate::ID),
+            &[funnel_accounts.leader_state.clone()],
+            &[&[&funnel_accounts.leader.key.to_bytes() as &[u8], &[leader_state_bump]]],
         )?;
     }
 
     // Set the last slot to the current slot.
-    let mut leader_state = funnel_accounts.receiver_new_state.data.borrow_mut();
+    let mut leader_state = funnel_accounts.leader_state.data.borrow_mut();
     let leader_state = bytemuck::from_bytes_mut::<LeaderState>(&mut leader_state);
     leader_state.last_slot = Clock::get().unwrap().slot;
 
@@ -168,22 +173,22 @@ fn split_rewards(accounts: &BecomeReceiverAccounts, additional_lamports: u64) {
     if stakers_additional > 0 {
         invoke(
             &system_instruction::transfer(
-                accounts.receiver_new.key,
+                accounts.leader.key,
                 accounts.stakers_receiver.key,
                 stakers_additional,
             ),
-            &[accounts.receiver_new.clone(), accounts.stakers_receiver.clone()],
+            &[accounts.leader.clone(), accounts.stakers_receiver.clone()],
         )
         .unwrap();
     }
     if holders_additional > 0 {
         invoke(
             &system_instruction::transfer(
-                accounts.receiver_new.key,
+                accounts.leader.key,
                 accounts.holders_receiver.key,
                 holders_additional,
             ),
-            &[accounts.receiver_new.clone(), accounts.holders_receiver.clone()],
+            &[accounts.leader.clone(), accounts.holders_receiver.clone()],
         )
         .unwrap();
     }

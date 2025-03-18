@@ -9,13 +9,12 @@ use crate::{
 };
 
 pub struct BecomeReceiverAccounts {
-    pub payer: Pubkey,
+    pub leader: Pubkey,
     pub funnel_config: Pubkey,
     pub block_builder_old: Pubkey,
     pub tip_receiver_old: Pubkey,
     pub paladin_receiver_old: Pubkey,
     pub paladin_receiver_new: Pubkey,
-    pub paladin_receiver_new_state: Pubkey,
 }
 
 pub fn ix(
@@ -40,9 +39,9 @@ pub fn account_metas(accounts: BecomeReceiverAccounts, config: &FunnelConfig) ->
         AccountMeta { pubkey: config.stakers_receiver, is_signer: false, is_writable: true },
         AccountMeta { pubkey: config.holders_receiver, is_signer: false, is_writable: true },
         AccountMeta { pubkey: accounts.paladin_receiver_old, is_signer: false, is_writable: true },
-        AccountMeta { pubkey: accounts.paladin_receiver_new, is_signer: true, is_writable: true },
+        AccountMeta { pubkey: accounts.leader, is_signer: true, is_writable: true },
         AccountMeta {
-            pubkey: accounts.paladin_receiver_new_state,
+            pubkey: crate::state::find_leader_state(&accounts.leader).0,
             is_signer: false,
             is_writable: true,
         },
@@ -58,7 +57,7 @@ pub fn account_metas(accounts: BecomeReceiverAccounts, config: &FunnelConfig) ->
         AccountMeta { pubkey: JITO_TIP_ACCOUNT_5, is_signer: false, is_writable: true },
         AccountMeta { pubkey: JITO_TIP_ACCOUNT_6, is_signer: false, is_writable: true },
         AccountMeta { pubkey: JITO_TIP_ACCOUNT_7, is_signer: false, is_writable: true },
-        AccountMeta { pubkey: accounts.payer, is_signer: true, is_writable: true },
+        AccountMeta { pubkey: accounts.leader, is_signer: true, is_writable: true },
         AccountMeta { pubkey: JITO_TIP_PAYMENT_PROGRAM, is_signer: false, is_writable: false },
     ]
 }
