@@ -50,6 +50,9 @@ pub(crate) fn process(
         leader_state: accounts_iter.next().unwrap(),
     };
 
+    // Ensure the leader is a signer.
+    assert!(funnel_accounts.leader.is_signer);
+
     // Validate & deserialize the funnel account.
     assert_eq!(funnel_accounts.funnel.owner, &crate::ID);
     let funnel_borrow = funnel_accounts.funnel.data.borrow();
